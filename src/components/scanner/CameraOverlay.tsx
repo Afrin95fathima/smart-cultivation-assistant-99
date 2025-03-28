@@ -1,8 +1,58 @@
 
 import { X, Image, Mic, Info } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useState } from "react";
+import { toast } from "sonner";
 
 const CameraOverlay = () => {
+  const [isScanning, setIsScanning] = useState(false);
+  
+  // This function would be called when a user takes a picture
+  const handleCapture = async () => {
+    setIsScanning(true);
+    toast.info("Processing image...");
+    
+    try {
+      // In a real implementation, this would get the actual camera image
+      // For now we're simulating an API call
+      
+      // Here you would:
+      // 1. Get the image from the camera
+      // 2. Convert it to base64 or a blob
+      // 3. Send it to your backend API
+      
+      // Simulated API call
+      const response = await fetch('https://your-backend-url.com/predict-disease', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          // In a real implementation, this would be the base64 image
+          image: "simulated_image_data",
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      
+      // Process the response
+      const result = await response.json();
+      
+      // Store the result in sessionStorage to pass to the result page
+      sessionStorage.setItem('diseaseResult', JSON.stringify(result));
+      
+      // Navigate to result page
+      window.location.href = '/scanner/result';
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error("Failed to process image. Please try again.");
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
   return (
     <div className="relative h-full w-full bg-black">
       {/* Camera Viewfinder - This would connect to actual camera in a real implementation */}
@@ -28,7 +78,9 @@ const CameraOverlay = () => {
                 <div className="h-14 w-14 rounded-full bg-white/10 flex items-center justify-center mb-2 pulse-ring">
                   <Mic className="text-white/90" size={24} />
                 </div>
-                <p className="text-sm font-medium">Scanning...</p>
+                <p className="text-sm font-medium">
+                  {isScanning ? "Analyzing..." : "Scanning..."}
+                </p>
                 <p className="text-xs opacity-80">Center the leaf in the frame</p>
               </div>
             </div>
@@ -59,14 +111,15 @@ const CameraOverlay = () => {
       
       {/* Bottom controls */}
       <div className="absolute bottom-8 left-0 right-0 flex justify-center">
-        <Link 
-          to="/scanner/result" 
-          className="h-16 w-16 rounded-full bg-gradient-to-tr from-farming-green to-farming-green-light flex items-center justify-center shadow-lg glow-effect"
+        <button 
+          onClick={handleCapture}
+          disabled={isScanning}
+          className={`h-16 w-16 rounded-full bg-gradient-to-tr from-farming-green to-farming-green-light flex items-center justify-center shadow-lg glow-effect ${isScanning ? 'opacity-70' : ''}`}
         >
           <div className="h-14 w-14 rounded-full bg-white/20 flex items-center justify-center">
-            <div className="h-10 w-10 rounded-full bg-white/20 animate-pulse-gentle"></div>
+            <div className={`h-10 w-10 rounded-full bg-white/20 ${isScanning ? 'animate-pulse-fast' : 'animate-pulse-gentle'}`}></div>
           </div>
-        </Link>
+        </button>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
-
 import { Card } from "@/components/ui/card";
 import { Info, Droplet, ExternalLink, AlertTriangle } from "lucide-react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 
 interface FertilizerRecommendationProps {
@@ -8,7 +8,16 @@ interface FertilizerRecommendationProps {
 }
 
 const FertilizerRecommendation = ({ diseaseName }: FertilizerRecommendationProps) => {
-  // Simplified data with single recommended fertilizer and Amazon link
+  // Default fertilizer data
+  const [fertilizerData, setFertilizerData] = useState({
+    name: "Loading...",
+    usage: "Loading application details...",
+    effectiveness: 80,
+    organic: false,
+    amazonLink: "#"
+  });
+  
+  // Static disease info for fallback
   const diseaseInfo = {
     "Bacterial Leaf Blight": {
       description: "Bacterial Leaf Blight is a serious rice disease caused by Xanthomonas oryzae that leads to wilting and yellowing of leaves.",
@@ -67,6 +76,39 @@ const FertilizerRecommendation = ({ diseaseName }: FertilizerRecommendationProps
     }
   };
 
+  useEffect(() => {
+    // Try to retrieve fertilizer data from session storage (set in DiseaseResult.tsx)
+    const storedFertilizerData = sessionStorage.getItem('fertilizerResult');
+    
+    if (storedFertilizerData) {
+      try {
+        const parsedFertilizerData = JSON.parse(storedFertilizerData);
+        
+        setFertilizerData({
+          name: parsedFertilizerData.fertilizer || "Unknown Fertilizer",
+          usage: parsedFertilizerData.guidelines || "No specific guidelines available",
+          effectiveness: 85, // Default effectiveness
+          organic: false,    // Default organic status
+          amazonLink: "#"    // Default link
+        });
+        
+        // Clear session storage
+        sessionStorage.removeItem('fertilizerResult');
+      } catch (error) {
+        console.error('Error parsing fertilizer data:', error);
+        toast.error("Could not load fertilizer data");
+        
+        // Fallback to static data
+        const currentDisease = diseaseInfo[diseaseName as keyof typeof diseaseInfo] || diseaseInfo["Bacterial Leaf Blight"];
+        setFertilizerData(currentDisease.fertilizer);
+      }
+    } else {
+      // No data from API, use the static data
+      const currentDisease = diseaseInfo[diseaseName as keyof typeof diseaseInfo] || diseaseInfo["Bacterial Leaf Blight"];
+      setFertilizerData(currentDisease.fertilizer);
+    }
+  }, [diseaseName]);
+
   const currentDisease = diseaseInfo[diseaseName as keyof typeof diseaseInfo] || diseaseInfo["Bacterial Leaf Blight"];
   
   const getSeverityColor = (severity: string) => {
@@ -85,7 +127,7 @@ const FertilizerRecommendation = ({ diseaseName }: FertilizerRecommendationProps
   };
 
   const handleBuyNow = () => {
-    window.open(currentDisease.fertilizer.amazonLink, '_blank');
+    window.open(fertilizerData.amazonLink, '_blank');
     toast.success("Opening Amazon product page");
   };
 
@@ -111,29 +153,29 @@ const FertilizerRecommendation = ({ diseaseName }: FertilizerRecommendationProps
       <Card className="p-4 border border-gray-100 mb-4">
         <div className="flex justify-between items-start">
           <div className="flex items-start">
-            <div className={`h-12 w-12 rounded-full ${currentDisease.fertilizer.organic ? 'bg-farming-green/10' : 'bg-farming-sky/10'} flex items-center justify-center mr-3`}>
-              <Droplet size={24} className={currentDisease.fertilizer.organic ? 'text-farming-green' : 'text-farming-sky'} />
+            <div className={`h-12 w-12 rounded-full ${fertilizerData.organic ? 'bg-farming-green/10' : 'bg-farming-sky/10'} flex items-center justify-center mr-3`}>
+              <Droplet size={24} className={fertilizerData.organic ? 'text-farming-green' : 'text-farming-sky'} />
             </div>
             <div>
               <div className="flex items-center">
-                <h4 className="font-semibold text-lg">{currentDisease.fertilizer.name}</h4>
-                {currentDisease.fertilizer.organic && (
+                <h4 className="font-semibold text-lg">{fertilizerData.name}</h4>
+                {fertilizerData.organic && (
                   <span className="ml-2 text-xs bg-farming-green/10 text-farming-green px-2 py-0.5 rounded-full">
                     Organic
                   </span>
                 )}
               </div>
-              <p className="text-sm text-gray-700 mt-1">{currentDisease.fertilizer.usage}</p>
+              <p className="text-sm text-gray-700 mt-1">{fertilizerData.usage}</p>
               
               <div className="mt-3 flex items-center">
                 <div className="text-xs mr-2">Effectiveness:</div>
                 <div className="w-28 h-3 bg-gray-200 rounded-full overflow-hidden">
                   <div 
-                    className={`h-full ${getEffectivenessClass(currentDisease.fertilizer.effectiveness)}`}
-                    style={{width: `${currentDisease.fertilizer.effectiveness}%`}}
+                    className={`h-full ${getEffectivenessClass(fertilizerData.effectiveness)}`}
+                    style={{width: `${fertilizerData.effectiveness}%`}}
                   ></div>
                 </div>
-                <div className="text-xs ml-2 font-medium">{currentDisease.fertilizer.effectiveness}%</div>
+                <div className="text-xs ml-2 font-medium">{fertilizerData.effectiveness}%</div>
               </div>
             </div>
           </div>
