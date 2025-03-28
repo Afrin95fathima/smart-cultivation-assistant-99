@@ -1,3 +1,4 @@
+
 import { Card } from "@/components/ui/card";
 import { Info, Droplet, ExternalLink, AlertTriangle } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -88,7 +89,7 @@ const FertilizerRecommendation = ({ diseaseName }: FertilizerRecommendationProps
           name: parsedFertilizerData.fertilizer || "Unknown Fertilizer",
           usage: parsedFertilizerData.guidelines || "No specific guidelines available",
           effectiveness: 85, // Default effectiveness
-          organic: false,    // Default organic status
+          organic: parsedFertilizerData.fertilizer?.toLowerCase().includes("organic") || false,
           amazonLink: "#"    // Default link
         });
         
@@ -127,7 +128,12 @@ const FertilizerRecommendation = ({ diseaseName }: FertilizerRecommendationProps
   };
 
   const handleBuyNow = () => {
-    window.open(fertilizerData.amazonLink, '_blank');
+    // For organic fertilizers, we'll use a different Amazon link
+    const amazonLink = fertilizerData.organic 
+      ? "https://www.amazon.com/s?k=organic+fertilizer" 
+      : fertilizerData.amazonLink;
+      
+    window.open(amazonLink, '_blank');
     toast.success("Opening Amazon product page");
   };
 

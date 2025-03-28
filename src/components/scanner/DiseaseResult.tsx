@@ -1,3 +1,4 @@
+
 import { ArrowLeft, Share2, AlertTriangle, CheckCircle, Info } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -14,6 +15,9 @@ interface DiseaseResultProps {
 }
 
 const DiseaseResult = (props: DiseaseResultProps) => {
+  // API URL - update this to your deployed backend URL
+  const API_URL = "http://localhost:8000";
+  
   const [result, setResult] = useState<DiseaseResultProps>({
     diseaseName: props.diseaseName || "Loading...",
     severity: props.severity || "mild",
@@ -42,7 +46,7 @@ const DiseaseResult = (props: DiseaseResultProps) => {
           severity: severity,
           treatment: parsedResult.recommendations || "No specific treatment recommendations available.",
           confidence: parsedResult.confidence,
-          symptoms: [
+          symptoms: parsedResult.symptoms || [
             "Yellow to white lesions along the leaf veins",
             "Lesions turn yellow to white as they develop",
             "Wilting of leaves in severe cases",
@@ -73,7 +77,7 @@ const DiseaseResult = (props: DiseaseResultProps) => {
     try {
       toast.info("Getting fertilizer recommendations...");
       
-      const response = await fetch('https://your-backend-url.com/recommend-fertilizer', {
+      const response = await fetch(`${API_URL}/recommend-fertilizer`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -82,7 +86,7 @@ const DiseaseResult = (props: DiseaseResultProps) => {
       });
       
       if (!response.ok) {
-        throw new Error('Network response was not ok');
+        throw new Error(`HTTP error! Status: ${response.status}`);
       }
       
       const fertilizerResult = await response.json();
@@ -93,6 +97,15 @@ const DiseaseResult = (props: DiseaseResultProps) => {
     } catch (error) {
       console.error('Error:', error);
       toast.error("Failed to get fertilizer recommendations. Please try again.");
+      
+      // Fallback to simulated data if the API call fails
+      const simulatedFertilizerResult = {
+        fertilizer: "Generic Fertilizer for " + result.diseaseName,
+        guidelines: "Apply as directed based on plant size and severity of infection. Water thoroughly after application."
+      };
+      
+      sessionStorage.setItem('fertilizerResult', JSON.stringify(simulatedFertilizerResult));
+      window.location.href = '/fertilizer';
     }
   };
 
