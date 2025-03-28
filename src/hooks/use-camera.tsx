@@ -54,7 +54,14 @@ export function useCamera() {
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+        videoRef.current.onloadedmetadata = () => {
+          if (videoRef.current) {
+            videoRef.current.play().catch(e => {
+              console.error("Error playing video:", e);
+              toast.error("Could not start video stream");
+            });
+          }
+        };
         setCameraActive(true);
         setPermissionDenied(false);
         toast.success("Camera started successfully");
@@ -91,8 +98,8 @@ export function useCamera() {
       const canvas = canvasRef.current;
       
       // Set canvas dimensions to match video
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
       
       // Draw current video frame to canvas
       const context = canvas.getContext('2d');
@@ -110,6 +117,8 @@ export function useCamera() {
             stopCamera();
             
             toast.success("Image captured successfully");
+          } else {
+            toast.error("Failed to capture image");
           }
         }, 'image/jpeg', 0.95);
       }
