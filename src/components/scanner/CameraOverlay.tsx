@@ -1,28 +1,128 @@
-
-import { X, Image, Mic, Info } from "lucide-react";
+import { X, Image, Mic, Info, Camera } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const CameraOverlay = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [cameraActive, setCameraActive] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isMobile = useIsMobile();
   
   // API URL - update this to your deployed backend URL
   const API_URL = "http://localhost:8000";
+  
+  useEffect(() => {
+    // Cleanup function to stop the camera when component unmounts
+    return () => {
+      stopCamera();
+    };
+  }, []);
+
+  const startCamera = async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast.error("Camera access is not supported by this browser");
+        return;
+      }
+      
+      const constraints = {
+        video: {
+          facingMode: isMobile ? "environment" : "user",
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      };
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+        setCameraActive(true);
+        toast.success("Camera started successfully");
+      }
+    } catch (error) {
+      console.error("Error accessing camera:", error);
+      toast.error("Failed to access camera. Please check permissions.");
+    }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+      tracks.forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+      setCameraActive(false);
+    }
+  };
   
   // Function to handle file selection from device
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       setSelectedImage(event.target.files[0]);
+      // Stop camera if running
+      if (cameraActive) {
+        stopCamera();
+      }
+    }
+  };
+  
+  // Capture image from camera
+  const captureFromCamera = () => {
+    if (!cameraActive) {
+      startCamera();
+      return;
+    }
+    
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      
+      // Set canvas dimensions to match video
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      // Draw current video frame to canvas
+      const context = canvas.getContext('2d');
+      if (context) {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Convert canvas to blob
+        canvas.toBlob((blob) => {
+          if (blob) {
+            // Create File object from Blob
+            const capturedImage = new File([blob], "captured-image.jpg", { type: "image/jpeg" });
+            setSelectedImage(capturedImage);
+            
+            // Stop camera after capturing
+            stopCamera();
+            
+            toast.success("Image captured successfully");
+          }
+        }, 'image/jpeg', 0.95);
+      }
     }
   };
   
   // This function would be called when a user takes a picture or selects a file
   const handleCapture = async () => {
+    if (cameraActive) {
+      captureFromCamera();
+      return;
+    }
+    
     if (!selectedImage) {
-      // If no image is selected, we'll simulate the process
-      // In a real implementation, this would get the actual camera image
+      // If no image is selected and camera is not active, start camera
+      if (!cameraActive) {
+        startCamera();
+        return;
+      }
+      
+      // Otherwise simulate for testing
       simulateCapture();
       return;
     }
@@ -93,7 +193,7 @@ const CameraOverlay = () => {
 
   return (
     <div className="relative h-full w-full bg-black">
-      {/* Camera Viewfinder - This would connect to actual camera in a real implementation */}
+      {/* Camera Viewfinder */}
       <div className="h-full w-full bg-black flex items-center justify-center">
         {selectedImage ? (
           <img 
@@ -101,12 +201,23 @@ const CameraOverlay = () => {
             alt="Selected plant" 
             className="h-full w-full object-contain" 
           />
+        ) : cameraActive ? (
+          <video 
+            ref={videoRef} 
+            className="h-full w-full object-cover" 
+            playsInline 
+            muted
+          />
         ) : (
-          <div className="text-white text-center">
-            <p>Camera preview would appear here</p>
-            <p className="text-xs opacity-70 mt-1">(Camera permission required)</p>
+          <div className="text-white text-center p-4">
+            <Camera size={48} className="mx-auto mb-2 opacity-50" />
+            <p>Tap the button below to start camera</p>
+            <p className="text-xs opacity-70 mt-1">or use the gallery icon to select an image</p>
           </div>
         )}
+        
+        {/* Hidden canvas for capturing images */}
+        <canvas ref={canvasRef} className="hidden" />
       </div>
       
       {/* AR Scanner Guide Overlay */}
@@ -120,15 +231,17 @@ const CameraOverlay = () => {
               <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-farming-green"></div>
               <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-farming-green"></div>
               
-              <div className="text-white text-center">
-                <div className="h-14 w-14 rounded-full bg-white/10 flex items-center justify-center mb-2 pulse-ring">
-                  <Mic className="text-white/90" size={24} />
+              {!selectedImage && !cameraActive && (
+                <div className="text-white text-center">
+                  <div className="h-14 w-14 rounded-full bg-white/10 flex items-center justify-center mb-2 pulse-ring">
+                    <Mic className="text-white/90" size={24} />
+                  </div>
+                  <p className="text-sm font-medium">
+                    {isScanning ? "Analyzing..." : "Ready to scan"}
+                  </p>
+                  <p className="text-xs opacity-80">Center the leaf in the frame</p>
                 </div>
-                <p className="text-sm font-medium">
-                  {isScanning ? "Analyzing..." : "Scanning..."}
-                </p>
-                <p className="text-xs opacity-80">{selectedImage ? "Image selected" : "Center the leaf in the frame"}</p>
-              </div>
+              )}
             </div>
           </div>
           
@@ -137,7 +250,12 @@ const CameraOverlay = () => {
             <div className="flex items-start mb-2">
               <Info size={16} className="text-farming-gold mt-0.5 mr-2" />
               <p className="text-white text-sm flex-1">
-                {selectedImage ? "Tap the button below to analyze the selected image" : "Hold your camera steady over the affected plant part for best results"}
+                {selectedImage 
+                  ? "Tap the button below to analyze the selected image" 
+                  : cameraActive 
+                    ? "Hold your camera steady over the affected plant part and tap to capture" 
+                    : "Tap the button below to start camera"
+                }
               </p>
             </div>
           </div>
@@ -164,7 +282,7 @@ const CameraOverlay = () => {
       {/* Bottom controls */}
       <div className="absolute bottom-8 left-0 right-0 flex justify-center">
         <button 
-          onClick={handleCapture}
+          onClick={cameraActive ? captureFromCamera : handleCapture}
           disabled={isScanning}
           className={`h-16 w-16 rounded-full bg-gradient-to-tr from-farming-green to-farming-green-light flex items-center justify-center shadow-lg glow-effect ${isScanning ? 'opacity-70' : ''}`}
         >
