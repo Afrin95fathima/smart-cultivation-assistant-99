@@ -45,9 +45,9 @@ const heatmapOptions = {
 };
 
 const DiseaseMap = () => {
-  const [userPosition, setUserPosition] = useState(null);
-  const [mapCenter, setMapCenter] = useState(center);
-  const mapRef = useRef();
+  const [userPosition, setUserPosition] = useState<google.maps.LatLngLiteral | null>(null);
+  const [mapCenter, setMapCenter] = useState<google.maps.LatLngLiteral>(center);
+  const mapRef = useRef<google.maps.Map | null>(null);
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: "AIzaSyCv-JPw3TXAd-FXfH-iO4ISssAycywJXbE",
@@ -75,14 +75,14 @@ const DiseaseMap = () => {
     }
   }, []);
 
-  const onMapLoad = useCallback((map) => {
+  const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
   }, []);
 
   const handleLocateMe = () => {
-    if (userPosition) {
+    if (userPosition && mapRef.current) {
       setMapCenter(userPosition);
-      mapRef.current?.panTo(userPosition);
+      mapRef.current.panTo(userPosition);
     }
   };
 
