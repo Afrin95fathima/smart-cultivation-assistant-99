@@ -1,12 +1,8 @@
 
-import { Camera, MessageCircle } from "lucide-react";
+import { Camera } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useState } from "react";
-import AIAssistant from "@/components/assistant/AIAssistant";
 
 const FloatingActionButton = () => {
-  const [assistantOpen, setAssistantOpen] = useState(false);
-  
   return (
     <>
       {/* Scanner Button */}
@@ -21,22 +17,6 @@ const FloatingActionButton = () => {
           <Camera size={28} className="relative z-10 animate-pulse-gentle" />
         </div>
       </Link>
-      
-      {/* Chat Button */}
-      <button
-        onClick={() => setAssistantOpen(true)}
-        className="fixed bottom-24 left-4 z-20 h-14 w-14 rounded-full bg-farming-sky text-white shadow-lg flex items-center justify-center"
-        aria-label="Open AI Assistant"
-      >
-        <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-farming-sky to-blue-500 opacity-90"></div>
-        <MessageCircle size={22} className="relative z-10" />
-      </button>
-      
-      {/* AI Assistant Modal */}
-      <AIAssistant 
-        isOpen={assistantOpen} 
-        onClose={() => setAssistantOpen(false)} 
-      />
     </>
   );
 };

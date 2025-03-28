@@ -1,5 +1,5 @@
 
-import { Home, Leaf, Map } from "lucide-react";
+import { Home, Leaf, Map, Users, MessageCircle } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
 const BottomNavigation = () => {
@@ -8,6 +8,8 @@ const BottomNavigation = () => {
 
   const navItems = [
     { path: "/", icon: Home, label: "Home" },
+    { path: "/chat", icon: MessageCircle, label: "Chat" },
+    { path: "/community", icon: Users, label: "Community" },
     { path: "/fertilizer", icon: Leaf, label: "Fertilizer" },
     { path: "/heatmap", icon: Map, label: "Heatmap" },
   ];
@@ -19,7 +21,7 @@ const BottomNavigation = () => {
           <Link 
             key={item.path} 
             to={item.path}
-            className={`flex flex-col items-center justify-center w-1/4 py-1 ${
+            className={`flex flex-col items-center justify-center w-1/5 py-1 ${
               currentPath === item.path 
                 ? "text-farming-green" 
                 : "text-gray-500"
