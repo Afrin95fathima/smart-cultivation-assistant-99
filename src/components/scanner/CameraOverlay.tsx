@@ -1,3 +1,4 @@
+
 import { X, Image, Mic, Info, Camera } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
@@ -8,6 +9,7 @@ const CameraOverlay = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isMobile = useIsMobile();
@@ -16,13 +18,30 @@ const CameraOverlay = () => {
   const API_URL = "http://localhost:8000";
   
   useEffect(() => {
+    // Check camera permission on component mount
+    checkCameraPermission();
+    
     // Cleanup function to stop the camera when component unmounts
     return () => {
       stopCamera();
     };
   }, []);
 
+  const checkCameraPermission = async () => {
+    try {
+      // Just check if we can get permission without starting the stream
+      await navigator.mediaDevices.getUserMedia({ video: true });
+      // If we get here, permission was granted previously
+      setPermissionDenied(false);
+    } catch (error) {
+      console.log("Initial camera permission check:", error);
+      // We don't set permissionDenied here as it might just be that the user hasn't been asked yet
+    }
+  };
+
   const startCamera = async () => {
+    if (cameraActive) return; // Don't start camera if already active
+    
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         toast.error("Camera access is not supported by this browser");
@@ -31,7 +50,7 @@ const CameraOverlay = () => {
       
       const constraints = {
         video: {
-          facingMode: isMobile ? "environment" : "user",
+          facingMode: isMobile ? "environment" : "user", // Use rear camera on mobile
           width: { ideal: 1280 },
           height: { ideal: 720 }
         }
@@ -41,13 +60,20 @@ const CameraOverlay = () => {
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        await videoRef.current.play();
         setCameraActive(true);
+        setPermissionDenied(false);
         toast.success("Camera started successfully");
       }
     } catch (error) {
       console.error("Error accessing camera:", error);
-      toast.error("Failed to access camera. Please check permissions.");
+      setPermissionDenied(true);
+      
+      if (error instanceof DOMException && error.name === 'NotAllowedError') {
+        toast.error("Camera permission denied. Please enable camera access in your browser settings.");
+      } else {
+        toast.error("Failed to access camera. Please check permissions or try a different browser.");
+      }
     }
   };
 
@@ -206,13 +232,18 @@ const CameraOverlay = () => {
             ref={videoRef} 
             className="h-full w-full object-cover" 
             playsInline 
+            autoPlay
             muted
           />
         ) : (
           <div className="text-white text-center p-4">
             <Camera size={48} className="mx-auto mb-2 opacity-50" />
-            <p>Tap the button below to start camera</p>
-            <p className="text-xs opacity-70 mt-1">or use the gallery icon to select an image</p>
+            <p>{permissionDenied ? "Camera access denied" : "Tap the button below to start camera"}</p>
+            <p className="text-xs opacity-70 mt-1">
+              {permissionDenied 
+                ? "Please check browser settings to enable camera" 
+                : "or use the gallery icon to select an image"}
+            </p>
           </div>
         )}
         
@@ -254,7 +285,9 @@ const CameraOverlay = () => {
                   ? "Tap the button below to analyze the selected image" 
                   : cameraActive 
                     ? "Hold your camera steady over the affected plant part and tap to capture" 
-                    : "Tap the button below to start camera"
+                    : permissionDenied
+                      ? "Camera access was denied. Use gallery option or check browser settings."
+                      : "Tap the button below to start camera"
                 }
               </p>
             </div>
