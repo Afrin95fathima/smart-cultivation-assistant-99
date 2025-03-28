@@ -2,6 +2,10 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Map as MapIcon, AlertTriangle, Navigation, Layers } from "lucide-react";
 import { GoogleMap, useLoadScript, HeatmapLayer } from "@react-google-maps/api";
+import { Button } from "../ui/button";
+
+// Define libraries array outside component to prevent performance warnings
+const libraries = ["visualization"];
 
 // Dummy disease outbreak data for testing
 const diseaseOutbreakData = [
@@ -47,11 +51,12 @@ const heatmapOptions = {
 const DiseaseMap = () => {
   const [userPosition, setUserPosition] = useState<google.maps.LatLngLiteral | null>(null);
   const [mapCenter, setMapCenter] = useState<google.maps.LatLngLiteral>(center);
+  const [mapError, setMapError] = useState<string | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
 
   const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: "AIzaSyCv-JPw3TXAd-FXfH-iO4ISssAycywJXbE",
-    libraries: ["visualization"],
+    googleMapsApiKey: "AIzaSyCv-JPw3TXAd-FXfH-iO4ISssAycywJXbE", // Consider using environment variables for API keys
+    libraries: libraries as any,
   });
 
   // Try to get user's location
@@ -75,6 +80,14 @@ const DiseaseMap = () => {
     }
   }, []);
 
+  // Handle Map error
+  useEffect(() => {
+    if (loadError) {
+      console.error("Google Maps error:", loadError);
+      setMapError("Failed to load Google Maps API. Please check your API key configuration.");
+    }
+  }, [loadError]);
+
   const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
   }, []);
@@ -86,13 +99,21 @@ const DiseaseMap = () => {
     }
   };
 
-  if (loadError) {
+  if (mapError || loadError) {
     return (
       <div className="relative w-full h-[500px] bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
         <div className="text-center p-4">
           <AlertTriangle size={36} className="text-red-500 mx-auto mb-2" />
-          <p className="text-gray-700">Error loading maps</p>
-          <p className="text-sm text-gray-500">Please try again later</p>
+          <p className="text-gray-700">{mapError || "Error loading maps"}</p>
+          <p className="text-sm text-gray-500">
+            Please verify your Google Maps API key has the Maps JavaScript API enabled and proper billing setup
+          </p>
+          <Button 
+            className="mt-4 bg-farming-green"
+            onClick={() => window.location.reload()}
+          >
+            Try Again
+          </Button>
         </div>
       </div>
     );
@@ -118,13 +139,15 @@ const DiseaseMap = () => {
         options={options}
         onLoad={onMapLoad}
       >
-        <HeatmapLayer
-          data={diseaseOutbreakData.map(point => ({
-            location: new window.google.maps.LatLng(point.lat, point.lng),
-            weight: point.weight
-          }))}
-          options={heatmapOptions}
-        />
+        {Array.isArray(diseaseOutbreakData) && diseaseOutbreakData.length > 0 && (
+          <HeatmapLayer
+            data={diseaseOutbreakData.map(point => ({
+              location: new window.google.maps.LatLng(point.lat, point.lng),
+              weight: point.weight
+            }))}
+            options={heatmapOptions}
+          />
+        )}
       </GoogleMap>
       
       {/* Map controls overlay */}
