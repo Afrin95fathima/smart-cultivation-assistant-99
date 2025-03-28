@@ -4,9 +4,7 @@ import PageContainer from "@/components/layout/PageContainer";
 import WelcomeHeader from "@/components/dashboard/WelcomeHeader";
 import WeatherCard from "@/components/dashboard/WeatherCard";
 import DiseaseScanner from "@/components/dashboard/DiseaseScanner";
-import CropPricesList from "@/components/dashboard/CropPricesList";
 import VoiceAssistantPanel from "@/components/voiceassistant/VoiceAssistantPanel";
-import FloatingActionButton from "@/components/common/FloatingActionButton";
 
 const Home = () => {
   return (
@@ -23,12 +21,7 @@ const Home = () => {
       
       <DiseaseScanner />
       
-      <CropPricesList />
-      
       <div className="mb-24"></div>
-      
-      {/* Floating scanner button */}
-      <FloatingActionButton />
     </PageContainer>
   );
 };
