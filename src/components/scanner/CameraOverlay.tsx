@@ -1,138 +1,23 @@
-
-import { X, Image, Mic, Info, Camera } from "lucide-react";
-import { Link } from "react-router-dom";
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
+import { Camera } from "lucide-react";
 import { toast } from "sonner";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useCamera } from "@/hooks/use-camera";
+import { TopControls, BottomControl } from "@/components/scanner/ScannerControls";
+import ScannerFrame from "@/components/scanner/ScannerFrame";
+import InfoPanel from "@/components/scanner/InfoPanel";
+import { predictDisease, simulateDiseaseResult } from "@/services/disease-service";
 
 const CameraOverlay = () => {
   const [isScanning, setIsScanning] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [cameraActive, setCameraActive] = useState(false);
-  const [permissionDenied, setPermissionDenied] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const isMobile = useIsMobile();
-  
-  // API URL - update this to your deployed backend URL
-  const API_URL = "http://localhost:8000";
-  
-  useEffect(() => {
-    // Check camera permission on component mount
-    checkCameraPermission();
-    
-    // Cleanup function to stop the camera when component unmounts
-    return () => {
-      stopCamera();
-    };
-  }, []);
-
-  const checkCameraPermission = async () => {
-    try {
-      // Just check if we can get permission without starting the stream
-      await navigator.mediaDevices.getUserMedia({ video: true });
-      // If we get here, permission was granted previously
-      setPermissionDenied(false);
-    } catch (error) {
-      console.log("Initial camera permission check:", error);
-      // We don't set permissionDenied here as it might just be that the user hasn't been asked yet
-    }
-  };
-
-  const startCamera = async () => {
-    if (cameraActive) return; // Don't start camera if already active
-    
-    try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        toast.error("Camera access is not supported by this browser");
-        return;
-      }
-      
-      const constraints = {
-        video: {
-          facingMode: isMobile ? "environment" : "user", // Use rear camera on mobile
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      };
-      
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setCameraActive(true);
-        setPermissionDenied(false);
-        toast.success("Camera started successfully");
-      }
-    } catch (error) {
-      console.error("Error accessing camera:", error);
-      setPermissionDenied(true);
-      
-      if (error instanceof DOMException && error.name === 'NotAllowedError') {
-        toast.error("Camera permission denied. Please enable camera access in your browser settings.");
-      } else {
-        toast.error("Failed to access camera. Please check permissions or try a different browser.");
-      }
-    }
-  };
-
-  const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-      tracks.forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-      setCameraActive(false);
-    }
-  };
-  
-  // Function to handle file selection from device
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      setSelectedImage(event.target.files[0]);
-      // Stop camera if running
-      if (cameraActive) {
-        stopCamera();
-      }
-    }
-  };
-  
-  // Capture image from camera
-  const captureFromCamera = () => {
-    if (!cameraActive) {
-      startCamera();
-      return;
-    }
-    
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      
-      // Set canvas dimensions to match video
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      
-      // Draw current video frame to canvas
-      const context = canvas.getContext('2d');
-      if (context) {
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        // Convert canvas to blob
-        canvas.toBlob((blob) => {
-          if (blob) {
-            // Create File object from Blob
-            const capturedImage = new File([blob], "captured-image.jpg", { type: "image/jpeg" });
-            setSelectedImage(capturedImage);
-            
-            // Stop camera after capturing
-            stopCamera();
-            
-            toast.success("Image captured successfully");
-          }
-        }, 'image/jpeg', 0.95);
-      }
-    }
-  };
+  const {
+    cameraActive,
+    permissionDenied,
+    selectedImage,
+    videoRef,
+    canvasRef,
+    captureFromCamera,
+    handleFileSelect
+  } = useCamera();
   
   // This function would be called when a user takes a picture or selects a file
   const handleCapture = async () => {
@@ -144,7 +29,7 @@ const CameraOverlay = () => {
     if (!selectedImage) {
       // If no image is selected and camera is not active, start camera
       if (!cameraActive) {
-        startCamera();
+        captureFromCamera(); // This will start the camera
         return;
       }
       
@@ -157,25 +42,17 @@ const CameraOverlay = () => {
     toast.info("Processing image...");
     
     try {
-      // Create a FormData object to send the image to the backend
-      const formData = new FormData();
-      formData.append('file', selectedImage);
+      // Call the API service
+      const result = await predictDisease(selectedImage);
       
-      // Make the API call to the disease prediction endpoint
-      const response = await fetch(`${API_URL}/predict-disease`, {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
+      if (result) {
+        // Store the result in sessionStorage to pass to the result page
+        sessionStorage.setItem('diseaseResult', JSON.stringify(result));
+      } else {
+        // If API call failed, use simulated data
+        simulateCapture();
+        return;
       }
-      
-      // Process the response
-      const result = await response.json();
-      
-      // Store the result in sessionStorage to pass to the result page
-      sessionStorage.setItem('diseaseResult', JSON.stringify(result));
       
       // Navigate to result page
       window.location.href = '/scanner/result';
@@ -194,18 +71,8 @@ const CameraOverlay = () => {
     toast.info("Processing image...");
     
     setTimeout(() => {
-      // Sample response that mimics the API response format
-      const sampleResult = {
-        disease: "Bacterial Leaf Blight",
-        confidence: 85.7,
-        recommendations: "Apply copper-based bactericides. Ensure proper field drainage. Remove and destroy infected plants.",
-        description: "Bacterial Leaf Blight is a serious rice disease caused by Xanthomonas oryzae that leads to wilting and yellowing of leaves.",
-        symptoms: [
-          "Yellow to white lesions along the leaf veins",
-          "Lesions turn yellow to white as they develop",
-          "Wilting of leaves in severe cases"
-        ]
-      };
+      // Use the simulated result
+      const sampleResult = simulateDiseaseResult();
       
       // Store the result in sessionStorage
       sessionStorage.setItem('diseaseResult', JSON.stringify(sampleResult));
@@ -255,75 +122,30 @@ const CameraOverlay = () => {
       <div className="absolute inset-0 pointer-events-none">
         <div className="h-full flex flex-col">
           {/* Scanning frame */}
-          <div className="flex-1 flex items-center justify-center">
-            <div className="w-3/4 aspect-square rounded-3xl border-2 border-white/60 relative flex items-center justify-center">
-              <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-farming-green"></div>
-              <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-farming-green"></div>
-              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-farming-green"></div>
-              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-farming-green"></div>
-              
-              {!selectedImage && !cameraActive && (
-                <div className="text-white text-center">
-                  <div className="h-14 w-14 rounded-full bg-white/10 flex items-center justify-center mb-2 pulse-ring">
-                    <Mic className="text-white/90" size={24} />
-                  </div>
-                  <p className="text-sm font-medium">
-                    {isScanning ? "Analyzing..." : "Ready to scan"}
-                  </p>
-                  <p className="text-xs opacity-80">Center the leaf in the frame</p>
-                </div>
-              )}
-            </div>
-          </div>
+          <ScannerFrame 
+            selectedImage={selectedImage} 
+            cameraActive={cameraActive} 
+            isScanning={isScanning} 
+          />
           
           {/* Instruction text */}
-          <div className="bg-black/50 backdrop-blur-sm p-4">
-            <div className="flex items-start mb-2">
-              <Info size={16} className="text-farming-gold mt-0.5 mr-2" />
-              <p className="text-white text-sm flex-1">
-                {selectedImage 
-                  ? "Tap the button below to analyze the selected image" 
-                  : cameraActive 
-                    ? "Hold your camera steady over the affected plant part and tap to capture" 
-                    : permissionDenied
-                      ? "Camera access was denied. Use gallery option or check browser settings."
-                      : "Tap the button below to start camera"
-                }
-              </p>
-            </div>
-          </div>
+          <InfoPanel 
+            selectedImage={selectedImage} 
+            cameraActive={cameraActive} 
+            permissionDenied={permissionDenied} 
+          />
         </div>
       </div>
       
-      {/* Controls */}
-      <div className="absolute top-6 left-0 right-0 flex justify-between px-4">
-        <Link to="/" className="h-10 w-10 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center">
-          <X className="text-white" size={20} />
-        </Link>
-        
-        <label className="h-10 w-10 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center cursor-pointer">
-          <Image className="text-white" size={20} />
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFileSelect}
-          />
-        </label>
-      </div>
+      {/* Top Controls */}
+      <TopControls onFileSelect={handleFileSelect} />
       
-      {/* Bottom controls */}
-      <div className="absolute bottom-8 left-0 right-0 flex justify-center">
-        <button 
-          onClick={cameraActive ? captureFromCamera : handleCapture}
-          disabled={isScanning}
-          className={`h-16 w-16 rounded-full bg-gradient-to-tr from-farming-green to-farming-green-light flex items-center justify-center shadow-lg glow-effect ${isScanning ? 'opacity-70' : ''}`}
-        >
-          <div className="h-14 w-14 rounded-full bg-white/20 flex items-center justify-center">
-            <div className={`h-10 w-10 rounded-full bg-white/20 ${isScanning ? 'animate-pulse-fast' : 'animate-pulse-gentle'}`}></div>
-          </div>
-        </button>
-      </div>
+      {/* Bottom control */}
+      <BottomControl 
+        onCapture={handleCapture} 
+        cameraActive={cameraActive} 
+        isScanning={isScanning} 
+      />
     </div>
   );
 };
